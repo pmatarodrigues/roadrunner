@@ -144,8 +144,8 @@ void draw() {
         textSize(40);
         text("GAME OVER", width/2, height/2 - 50);
         text("Pontuação: " + pontos, width/2, height/2 + 50);
-        text("Diga 'Jogar' para tentar novamente", width/2, height/2);
-        if (volume > limite) {
+        text("Clique para tentar novamente", width/2, height/2);
+        if (keyPressed) {
           gameOver = false;
           textAlign(CENTER);
           obstaculo.posicaoY = -2;
@@ -264,6 +264,7 @@ void selecionaCarro() {
   automovel.resize(180, 350);
   image(automovel, width/2 + automovel.width, 150); 
 
+  //------------ Seleção do carro
   if (keyPressed) {
     if (key == '1') {
       carro = tanque;
