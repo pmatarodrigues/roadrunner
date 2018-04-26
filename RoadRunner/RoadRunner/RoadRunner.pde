@@ -9,15 +9,18 @@ Capture camera;
 //AUDIO
 AudioIn inputAudio;
 Amplitude amplitude;
-AudioPlayer somCarro;
+AudioPlayer musica, erro, inicio, motorLigar;
+
 float volume;
 float limite;
 Minim minim;
 
+float jitter;
+float ang;
+
 float velocidade;
 float posicaoLinha;
 float z;
-int objeto;
 boolean aJogar = false;
 boolean carroEscolhido = false;
 
@@ -31,9 +34,10 @@ PShape buraco;
 PShape cone;
 PShape barreira;
 PShape aviso;
-PShape capacete;
+PImage capacete;
 PShape premio;
 PShape oculos;
+PShape volante;
 
 // ------- Informações de Jogo
 int pontos = 2;
@@ -87,11 +91,12 @@ void setup() {
   barreira = loadShape("barreira.svg");
   aviso = loadShape("aviso.svg");
   //-------------Cabeça
-  capacete = loadShape("capaceteMicro.svg");
+  capacete = loadImage("capacete.png");
   oculos = loadShape("oculos.svg");
   //-------------Premio
   premio = loadShape("premio.svg");
 
+  volante = loadShape("volante.svg");
   carregarSons();
   textAlign(CENTER);
 }
@@ -102,110 +107,59 @@ void setup() {
 void draw() { 
   //Analisar o volume e definir o limite
   volume = amplitude.analyze();
-  limite = 0.5;
-  if (!aJogar) {
+  limite = 0.4;
+  if (!aJogar) {      //----------------------------------------------------------------MENU INICIAL
     fill(255);
-    menu();
+    menu();    //------------ apresenta a pagina de inicio
   } else
-    if (!carroEscolhido) {
+    if (!carroEscolhido) {      //------------------------------------------------------MENU DE ESCOLHA DE CARRO
+      motorLigar.play();
+      musica.play();
+      camera.start();
       selecionaCarro();
     } else {
-      if (!gameOver) {
+      if (!gameOver) {                      //------------------------------------------INICIO DO JOGO
+        motorLigar.pause();
+        inicio.play();
         username = "";
-        somCarro.play();
-        camera.start();
+        carregarAmbiente();
         //----------- Atribuir valor de velocidade
         velocidade += 0.5 ; //aumentar velocidade gradualmente
-        carregarAmbiente();
         pontos += 1;
-        apresentarCamera();
-        //----------- Detetar Cara
+        apresentarCamera();   // ------------------- carregar camera
+        //-----------------------------------Detetar Cara
         opencv = new OpenCV(this, camera);
         opencv.loadCascade(OpenCV.CASCADE_FRONTALFACE);
         faces = opencv.detect();
-
+        //--------------------------------
         scale(-1, 1); //--- voltar a inverter camera
         noFill();
         stroke(0, 255, 0);
         strokeWeight(3);
-
-        //--------- Carregar Carro
-        for (int b = 0; b < faces.length; b++) {
-          if (carro == tanque) {
-            carro.resize(80, 85);
-          }
-          if (carro == automovel) {
-            carro.resize(70, 140);
-          }
-          xCarro = -faces[0].x + 675;
-          yCarro = faces[0].y + 400;
-          image(carro, xCarro, yCarro, carro.width, carro.height); //carro
-          shape(oculos, -faces[b].x + 207, faces[b].y + 160, faces[b].width, faces[b].height + 15); //capacete
-        }
-
+        carregarCarro(); // ------------------------ carregar carro
         // -------- Pontos
         apresentarPontuacao();
-
-        //--------- Em caso de colisão entre o obstaculo e o carro
+        //-------------------------------------------- Em caso de colisão entre o obstaculo e o carro
         for ( int c = 0; c < obstaculos.size(); c++) {
           Obstaculo obstaculo = obstaculos.get(c);
           if (colisao(obstaculo)) {
             gameOver = true;
           }
         }
-        if (keyPressed) {
+        if (keyPressed) {    //-------------- caso prima o ESPAÇO
           if (key == ' ') {
-            camera.stop();
             automovel = loadImage("mercedes.png");
             tanque = loadImage("tanque.png");
+            pontos = 0;
+            velocidade = map(z, 0, 20, 1, 20);
             carroEscolhido = false;
           }
         }
       } else {
-        //ECRA DE GAMEOVER
-        somCarro.pause();
-        camera.stop();
-        noStroke();
-        background(#66BB6A);
-        // retangulo atras das letras de game over
-        strokeWeight(70);
-        stroke(#A5D6A7);
-        noFill();
-        //fill(#66BB6A);
-        rect(width/2 - 400, height/2 - 200, 800, 400);
-        //----------------------------------------
-        fill(255);
-        textSize(100);
-        text("GAME OVER", width/2, height/2 - 50);
-        textSize(25);
-        text("Prima uma tecla para tentar novamente", width/2, height/2 + 10);
-        textSize(40);
-        text("Pontuação: " + pontos, width/2, height/2 + 60);
-
+        //------------------------------------------------------------------------------ ECRA DE GAMEOVER
+        ecraGameOver();      
         //--------------------------------------------------------------------------------------------- RECEBER O USERNAME
-        if (keyPressed) {
-          if (keyCode == BACKSPACE) {                                               //ELIMINA UMA LETRA
-            if (username.length() > 0) {
-              username = username.substring(0, username.length()-1);
-            }
-          } else if (keyCode == DELETE) {                                           //ELIMINA TUDO
-            username = "";
-          } else if (keyCode != SHIFT && keyCode != CONTROL && keyCode != ALT) {    //TECLAS DE SHIFT, CTRL E ALT NÃO FAZEM NADA
-            username = username + key;                                              //RESTANTES TECLAS ADICIONAM AO TEXTO
-          }
-          if (key == ENTER) {
-            guardarPontos(pontos, username);
-            carroEscolhido = false;
-            automovel = loadImage("mercedes.png");
-            tanque = loadImage("tanque.png");
-            gameOver = false;
-            obstaculo.posicaoY = -2;
-            pontos = 0;
-            velocidade = map(z, 0, 20, 1, 20);
-          }
-        }
-        text("Introduza o seu username:", width/2, height/2 + 100);
-        text(username, width/2, height/2 + 140);                                   //texto do username no ecra
+        receberUsername();
         //----------------------------------------------------------------------------------------------------------------
       }
     }
@@ -232,8 +186,8 @@ void carregarAmbiente() {
   if (obstaculo.posicaoY + obstaculo.getObjetoHeight() < 0) {  //menor que zero para que não seja visivel enquanto está a ser selecionado pelo random
     obstaculos.add(obstaculo);
     obstaculo.posicaoY = random(-30, -10);      //atribui um valor aleatorio no eixo do Y
-    //obstaculo.escolherFaixa();                  //atribui uma faixa aleatoria
-    obstaculo.posicaoX = random(width/3 + 20, width/2 + width/3/3 - 20);  //atribui posicao aleatoria no eixo do X com base na faixa escolhida
+    obstaculo.posicaoX = random(width/3 + obstaculo.getObjetoWidth()/2, width/2 + width/3/3 - obstaculo.getObjetoWidth()/2);
+    //obstaculo.posicaoX = random(width/3 + 20, width/2 + width/3/3 - 20);  //atribui posicao aleatoria no eixo do X com base na faixa
   }
   obstaculo.mostrar();
   obstaculo.mover(velocidade);
@@ -251,6 +205,14 @@ void apresentarPontuacao() {
   textSize(40);
   text(pontos, width/2 + 50, 60);
 
+  fill(#43A047);
+  noStroke();
+  rect(width/2 - 500, 50, 200, 55, 10);
+  textAlign(CENTER);
+  fill(255);
+  textSize(15);
+  text("Prima SPACE para voltar \na selecionar o carro", width/2 - 400, 70);
+
   //-------------------------------TOP ---------------
   String[] dados; 
   if (loadStrings("topPontos.txt") == null) {
@@ -267,7 +229,7 @@ void apresentarPontuacao() {
   }
 
   textSize(50);
-  text("TOP 5", width/2 + 400, 150);
+  text("TOP", width/2 + 400, 150);
   shape(premio, width/2 + 500, 100, 50, 50);
   int y = 200;
   textSize(20);
@@ -295,10 +257,8 @@ void apresentarCamera() {
   if (camera.available()) {
     camera.read();
   }
+
   camera.loadPixels();
-  textSize(15);
-  shape(aviso, 10, height/2 - camera.height + 85, 18, 18);
-  text("Está a ser filmado! ", 100, height/2 - camera.height + 100);
 
   rect(-3, height/2 - camera.height/2 - 3, camera.width + 6, camera.height + 6);
   scale(-1, 1); //inverter camera
@@ -324,17 +284,23 @@ boolean colisao(Obstaculo o) {
 void menu() {
   background(#FF7043);
   PShape icon;  
-  icon = loadShape("car-breakdown.svg");
+  PImage logos;
+  icon = loadShape("racer.svg");
+  logos = loadImage("logosIPVCESTG.png");
+  logos.resize(150, 60);
 
   pushMatrix();
   fill(#FF7043);
   strokeWeight(50);
   stroke(#FF8A65);
-  rect(width/2 - icon.width/2, 100, icon.width, icon.height - 60);
+  rect(width/2 - icon.width/2, 100, icon.width, icon.height - 130);
   popMatrix();
 
   fill(255);
   shape(icon, width/2 - icon.width/2 /2, height/2 - 270, icon.width/2, icon.height/2);
+  imageMode(CENTER);
+  image(logos, width - (logos.width/2 + 10), height - (logos.height/2 + 20));
+  imageMode(CORNER);
 
   textSize(15);
   text("(c) Pedro Mata Rodrigues", 110, height - 20);
@@ -388,7 +354,7 @@ void selecionaCarro() {
     rect(0, 0, width, 90);
     textSize(30);
     fill(255);
-    text("Clique ENTER para confirmar", width/2, 60);
+    text("Prima ENTER para confirmar", width/2, 60);
     tanque.resize(340, 350);
     image(tanque, width/2 - tanque.width - 40, 150);
   }
@@ -404,7 +370,7 @@ void selecionaCarro() {
     fill(#66BB6A);
     rect(0, 0, width, 90);
     fill(255);
-    text("Clique ENTER para confirmar", width/2, 60);
+    text("Prima ENTER para confirmar", width/2, 60);
     automovel.resize(180, 350);
     image(automovel, width/2 + automovel.width, 150);
   }
@@ -421,9 +387,90 @@ void selecionaCarro() {
 //---------------------------------------------------------- CARREGAR SONS ----------------------------------------------------------
 void carregarSons() {
   minim = new Minim(this);
-  somCarro = minim.loadFile("somCarro.mp3");
-  if (aJogar==true && carroEscolhido==true) {
-    somCarro.loop();
-  }
+  musica = minim.loadFile("we_walk_alone.mp3");
+  erro = minim.loadFile("erro.mp3");
+  inicio = minim.loadFile("inicio.mp3");
+  motorLigar = minim.loadFile("motor_ligar.mp3");
 }
 //--------------------------------------------------------------------------------------------------------------------
+
+
+//-------------------------------------------------------------------------ECRA DE GAME OVER
+void ecraGameOver() {
+  camera.stop();
+  erro.play();      //SOM DE ERRO
+  musica.pause();    //PARA A MUSICA
+  noStroke();
+  fill(#FF7043);
+  //fill(#66BB6A);
+  rect(width/2 - 400, height/2 - 200, 800, 400);
+  //----------------------------------------
+  fill(255);
+  textSize(100);
+  text("GAME OVER", width/2, height/2 - 50);
+  textSize(40);
+  text("Pontuação: " + pontos, width/2, height/2 + 60);
+}
+
+
+
+//-------------------------------------------------------------------------CARREGAR OS CARROS
+void carregarCarro() {
+  //--------- Carregar Carro
+  for (int b = 0; b < faces.length; b++) {
+    if (carro == tanque) {
+      carro.resize(80, 85);
+    }
+    if (carro == automovel) {
+      carro.resize(70, 140);
+    }
+    xCarro = -faces[0].x + 675;
+    yCarro = faces[0].y + 400;
+    image(carro, xCarro, yCarro, carro.width, carro.height); //carro
+    image(capacete, -faces[0].x + 190, faces[0].y + 135, faces[0].width + 45, faces[0].height + 70); //capacete
+
+    pushMatrix();
+    if (xCarro > width/2) {
+      jitter = 0.2;
+    }
+    if (xCarro < width/2) {
+      jitter = -0.2;
+    }
+    shapeMode(CENTER);
+    ang += jitter;
+    float c = cos(ang);
+    translate(150, height/2 + 175);
+    rotate(c);
+    shape(volante, 0, 0, 150, 150); //volante
+    popMatrix();
+  }
+}
+
+
+//------------------------------------------------------- INPUT DE USERNAME
+void receberUsername() {
+  if (keyPressed) {
+    if (keyCode == BACKSPACE) {                                               //ELIMINA UMA LETRA
+      if (username.length() > 0) {
+        username = username.substring(0, username.length()-1);
+      }
+    } else if (keyCode == DELETE) {                                           //ELIMINA TUDO
+      username = "";
+    } else if (keyCode != SHIFT && keyCode != CONTROL && keyCode != ALT) {    //TECLAS DE SHIFT, CTRL E ALT NÃO FAZEM NADA
+      username = username + key;                                              //RESTANTES TECLAS ADICIONAM AO TEXTO
+    }
+    if (key == ENTER) {
+      guardarPontos(pontos, username);
+      carroEscolhido = false;
+      automovel = loadImage("mercedes.png");
+      tanque = loadImage("tanque.png");
+      gameOver = false;
+      obstaculo.posicaoY = -2;
+      pontos = 0;
+      velocidade = map(z, 0, 20, 1, 20);
+    }
+  }
+  text("Introduza o seu username:", width/2, height/2 + 100);
+  textSize(25);
+  text(username, width/2, height/2 + 140);                                   //texto do username no ecra
+}

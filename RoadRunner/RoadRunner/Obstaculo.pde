@@ -1,36 +1,29 @@
 class Obstaculo {
   float posicaoX;
   float posicaoY = - 20 ;
-  int faixa;
-  int objeto = 0;
   int objetoWidth, objetoHeight;
-  int xMinimo, xMaximo;
+  int objeto;
 
   Obstaculo() {
     posicaoX = random(width/3 + 20, width/2 + width/3/3 - 20);
-    //escolherFaixa();                  //atribui uma faixa aleatoria
   }
 
   void mostrar() {
-    //objetos para além de cones apenas aparecem a partir de nivel 30
-    if (pontos < 500) {
-      objeto = 1;
-    }
-    if(posicaoY + 100 < 0){
-      objeto = (int)random(1,3); 
+    //objetos para além de cones apenas aparecem a partir dos 60 pontos
+    if (obstaculo.posicaoY < 0) {
+      if (pontos < 60) {
+        obstaculo.objeto = 0;
+      } else {
+        obstaculo.objeto = (int)random(0, 2);
+      }
     }
     //---- Definição dos objetos
-    if (objeto == 0){  //aviso
-      objetoWidth = 70; 
-      objetoHeight = 70;
-      shape(aviso, posicaoX, posicaoY, objetoWidth, objetoHeight);
-    }
-    if (objeto == 1) { //cone
+    if (objeto == 0) { //cone
       objetoWidth = 70;
       objetoHeight = 70;
       shape(cone, posicaoX, posicaoY, objetoWidth, objetoHeight);
     }
-    if (objeto == 2) { //buraco
+    if (objeto == 1) { //buraco
       objetoWidth = 100;
       objetoHeight = 170;
       shape(buraco, posicaoX, posicaoY, objetoWidth, objetoHeight);
@@ -39,31 +32,18 @@ class Obstaculo {
 
   void mover(float velocidade) {
     posicaoY += velocidade;
-    if(posicaoY > height){
+    if (posicaoY > height) {
       posicaoY = -5;
-      posicaoX = random(width/3 + 20, width/2 + width/3/3 - 20);
+      posicaoX = random(width/3 + obstaculo.getObjetoWidth()/2, width/2 + width/3/3 - obstaculo.getObjetoWidth()/2);
+      //posicaoX = random(width/3 + 20, width/2 + width/3/3 - 20);
       //escolherFaixa();
     }
   }
-/*
-  void escolherFaixa() {
-    faixa =(int) random(0,2);
-    if(faixa == 0){
-      xMinimo = width/3 + 20;
-      xMaximo = width/2;
-    }
-    if(faixa == 1){
-      xMinimo = width/2 + 20;
-      xMaximo = width/2 + width/3/3 - 20;
-    }
-  }
-  */
-  int getObjetoWidth(){
+  int getObjetoWidth() {
     return objetoWidth;
   }
-  
-  int getObjetoHeight(){
+
+  int getObjetoHeight() {
     return objetoHeight;
   }
- 
 }
